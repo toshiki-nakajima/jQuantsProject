@@ -78,8 +78,8 @@ export default function Home() {
         {getCurrentStocks().map(stock => (
           <div key={stock.Code} className={styles.card}>
             <div className={styles.codeBox}>{stock.Code}</div>
-            <h2>{stock.Name}</h2>
-            <p className={styles.englishName}>{stock.NameEnglish || "-"}</p>
+            <h2>{stock.CompanyName}</h2>
+            <p className={styles.englishName}>{stock.CompanyNameEnglish || "-"}</p>
           </div>
         ))}
       </div>
