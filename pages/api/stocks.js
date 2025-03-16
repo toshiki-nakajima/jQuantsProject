@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // JQuants API エンドポイント
-const AUTH_URL = 'https://api.jquants.com/v1/token/auth';
-const REFRESH_URL = 'https://api.jquants.com/v1/token/refresh';
+const REFRESH_URL = 'https://api.jquants.com/v1/token/auth_user';
+const AUTH_URL = 'https://api.jquants.com/v1/token/auth_refresh';
 const LISTED_URL = 'https://api.jquants.com/v1/listed/info';
 
 // 環境変数から認証情報を取得
@@ -13,21 +13,21 @@ const JQUANTS_PASSWORD = process.env.JQUANTS_PASSWORD;
 async function getToken() {
   try {
     // 認証トークンを取得
-    const authResponse = await axios.post(AUTH_URL, {
+    const refreshTokenResponse = await axios.post(REFRESH_URL, {
       mailaddress: JQUANTS_EMAIL,
       password: JQUANTS_PASSWORD
     });
-    
-    const idToken = authResponse.data.idToken;
-    
-    // リフレッシュトークンを取得
-    const refreshResponse = await axios.post(REFRESH_URL, {}, {
-      headers: {
-        'Authorization': `Bearer ${idToken}`
+
+    const refreshToken = refreshTokenResponse.data.refreshToken;
+
+    // idTokenを取得
+    const authResponse = await axios.post(AUTH_URL, {}, {
+      params: {
+        refreshtoken: refreshToken
       }
     });
-    
-    return refreshResponse.data.refreshToken;
+
+    return authResponse.data.idToken;
   } catch (error) {
     console.error('Token acquisition failed:', error);
     throw new Error('JQuants API認証に失敗しました');
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     // 結果を返す
     res.status(200).json(stocks);
   } catch (error) {
-    console.error('API error:', error);
-    res.status(500).json({ error: error.message });
+    // console.error('API error:', error);
+    // res.status(500).json({ error: error.message });
   }
 }
