@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // JQuants API エンドポイント
-const AUTH_URL = 'https://api.jquants.com/v1/token/auth';
-const REFRESH_URL = 'https://api.jquants.com/v1/token/refresh';
+const REFRESH_URL = 'https://api.jquants.com/v1/token/auth_user';
+const AUTH_URL = 'https://api.jquants.com/v1/token/auth_refresh';
 const LISTED_URL = 'https://api.jquants.com/v1/listed/info';
 
 // 環境変数から認証情報を取得
@@ -13,21 +13,21 @@ const JQUANTS_PASSWORD = process.env.JQUANTS_PASSWORD;
 async function getToken() {
   try {
     // 認証トークンを取得
-    const authResponse = await axios.post(AUTH_URL, {
+    const refreshTokenResponse = await axios.post(REFRESH_URL, {
       mailaddress: JQUANTS_EMAIL,
       password: JQUANTS_PASSWORD
     });
-    
-    const idToken = authResponse.data.idToken;
-    
-    // リフレッシュトークンを取得
-    const refreshResponse = await axios.post(REFRESH_URL, {}, {
-      headers: {
-        'Authorization': `Bearer ${idToken}`
+
+    const refreshToken = refreshTokenResponse.data.refreshToken;
+
+    // idTokenを取得
+    const authResponse = await axios.post(AUTH_URL, {}, {
+      params: {
+        refreshtoken: refreshToken
       }
     });
-    
-    return refreshResponse.data.refreshToken;
+
+    return authResponse.data.idToken;
   } catch (error) {
     console.error('Token acquisition failed:', error);
     throw new Error('JQuants API認証に失敗しました');
@@ -43,22 +43,56 @@ async function getListedStocks(token) {
       }
     });
     
-    return response.data.info;
+    // 銘柄情報を取得
+    const stocks = response.data.info;
+    
+    // 銘柄コード順にソート
+    return stocks.sort((a, b) => {
+      // 数値としてコードを比較
+      return parseInt(a.Code) - parseInt(b.Code);
+    });
   } catch (error) {
     console.error('Failed to fetch listed stocks:', error);
     throw new Error('上場銘柄情報の取得に失敗しました');
   }
 }
 
+// キャッシュ設定
+export const config = {
+  api: {
+    bodyParser: false,
+    externalResolver: true,
+    responseLimit: false,
+  },
+};
+
+let cachedStocks = null;
+let cacheTime = null;
+const CACHE_DURATION = 60 * 60 * 1000; // 60分（ミリ秒）
+
 export default async function handler(req, res) {
   try {
-    // トークン取得
-    const token = await getToken();
+    let stocks;
     
-    // 上場銘柄一覧取得
-    const stocks = await getListedStocks(token);
+    // キャッシュが有効かチェック
+    const now = Date.now();
+    if (cachedStocks && cacheTime && (now - cacheTime < CACHE_DURATION)) {
+      // キャッシュから取得
+      stocks = cachedStocks;
+      console.log('Using cached stocks data');
+    } else {
+      // 新しくAPIから取得
+      const token = await getToken();
+      stocks = await getListedStocks(token);
+      
+      // キャッシュを更新
+      cachedStocks = stocks;
+      cacheTime = now;
+      console.log('Fetched fresh stocks data');
+    }
     
     // 結果を返す
+    res.setHeader('Cache-Control', 'max-age=3600, s-maxage=3600');
     res.status(200).json(stocks);
   } catch (error) {
     console.error('API error:', error);
