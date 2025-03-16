@@ -12,16 +12,22 @@ export default function Home() {
   useEffect(() => {
     const fetchStocks = async () => {
       try {
+        console.log('Frontend: Fetching stocks from API...');
         const response = await fetch('/api/stocks');
+        console.log('Frontend: Response received, status:', response.status);
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch stocks');
+          throw new Error(`Failed to fetch stocks: ${response.status} ${response.statusText}`);
         }
+        
         const data = await response.json();
+        console.log(`Frontend: Parsed JSON data, received ${data.length} stocks`);
+        
         setStocks(data);
         setTotalPages(Math.ceil(data.length / stocksPerPage));
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching stocks:', err);
+        console.error('Frontend: Error fetching stocks:', err);
         setError(err.message);
         setLoading(false);
       }
@@ -72,7 +78,7 @@ export default function Home() {
         {getCurrentStocks().map(stock => (
           <div key={stock.Code} className={styles.card}>
             <div className={styles.codeBox}>{stock.Code}</div>
-            <h2>{stock.CompanyName}</h2>
+            <h2>{stock.Name}</h2>
             <p className={styles.englishName}>{stock.NameEnglish || "-"}</p>
           </div>
         ))}
