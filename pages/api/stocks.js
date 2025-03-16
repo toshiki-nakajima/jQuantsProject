@@ -43,25 +43,59 @@ async function getListedStocks(token) {
       }
     });
     
-    return response.data.info;
+    // 銘柄情報を取得
+    const stocks = response.data.info;
+    
+    // 銘柄コード順にソート
+    return stocks.sort((a, b) => {
+      // 数値としてコードを比較
+      return parseInt(a.Code) - parseInt(b.Code);
+    });
   } catch (error) {
     console.error('Failed to fetch listed stocks:', error);
     throw new Error('上場銘柄情報の取得に失敗しました');
   }
 }
 
+// キャッシュ設定
+export const config = {
+  api: {
+    bodyParser: false,
+    externalResolver: true,
+    responseLimit: false,
+  },
+};
+
+let cachedStocks = null;
+let cacheTime = null;
+const CACHE_DURATION = 60 * 60 * 1000; // 60分（ミリ秒）
+
 export default async function handler(req, res) {
   try {
-    // トークン取得
-    const token = await getToken();
+    let stocks;
     
-    // 上場銘柄一覧取得
-    const stocks = await getListedStocks(token);
+    // キャッシュが有効かチェック
+    const now = Date.now();
+    if (cachedStocks && cacheTime && (now - cacheTime < CACHE_DURATION)) {
+      // キャッシュから取得
+      stocks = cachedStocks;
+      console.log('Using cached stocks data');
+    } else {
+      // 新しくAPIから取得
+      const token = await getToken();
+      stocks = await getListedStocks(token);
+      
+      // キャッシュを更新
+      cachedStocks = stocks;
+      cacheTime = now;
+      console.log('Fetched fresh stocks data');
+    }
     
     // 結果を返す
+    res.setHeader('Cache-Control', 'max-age=3600, s-maxage=3600');
     res.status(200).json(stocks);
   } catch (error) {
-    // console.error('API error:', error);
-    // res.status(500).json({ error: error.message });
+    console.error('API error:', error);
+    res.status(500).json({ error: error.message });
   }
 }
