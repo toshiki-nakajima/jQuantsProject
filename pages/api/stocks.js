@@ -58,19 +58,13 @@ async function getListedStocks(token) {
 }
 
 // キャッシュ設定
-export const config = {
-  api: {
-    bodyParser: false,
-    externalResolver: true,
-    responseLimit: false,
-  },
-};
-
 let cachedStocks = null;
 let cacheTime = null;
 const CACHE_DURATION = 60 * 60 * 1000; // 60分（ミリ秒）
 
 export default async function handler(req, res) {
+  console.log('API request received:', req.method, req.url, new Date().toISOString());
+  
   try {
     let stocks;
     
@@ -82,18 +76,25 @@ export default async function handler(req, res) {
       console.log('Using cached stocks data');
     } else {
       // 新しくAPIから取得
+      console.log('Cache expired or not available. Fetching token...');
       const token = await getToken();
+      console.log('Token fetched successfully');
+      
+      console.log('Fetching listed stocks...');
       stocks = await getListedStocks(token);
+      console.log(`Fetched ${stocks.length} stocks successfully`);
       
       // キャッシュを更新
       cachedStocks = stocks;
       cacheTime = now;
-      console.log('Fetched fresh stocks data');
+      console.log('Cache updated with fresh data');
     }
     
     // 結果を返す
+    console.log('Sending response...');
     res.setHeader('Cache-Control', 'max-age=3600, s-maxage=3600');
     res.status(200).json(stocks);
+    console.log('Response sent successfully');
   } catch (error) {
     console.error('API error:', error);
     res.status(500).json({ error: error.message });
